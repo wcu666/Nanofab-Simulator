@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nanofabrication Simulator</title>
+    <!-- 引入 Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- 引入 MathJax 用來渲染 LaTeX 數學公式 -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        /* ================= 基礎設定 & 字體變數 ================= */
+        :root {
+            /* 現代 UI 字體 (用於內文、按鈕、數據面板，閱讀較不費力) */
+            --font-modern: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans TC', '微軟正黑體', sans-serif;
+            /* 學術專業字體 (用於標題、特定文獻段落) */
+            --font-academic: "Times New Roman", "DFKai-sb", "BiaoKai", "標楷體", serif;
+        }
+
+        body {
+                font-family: var(--font-modern);
+                margin: 0;
+                padding: 0;
+                /* 柔和紫藍漸層 */
+                background: linear-gradient(120deg, #e0c3fc 0%, #8ec5fc 100%);
+                background-attachment: fixed;
+                
+                color: #31333F;
+                padding-bottom: 80px; 
+                line-height: 1.6;
+        }
+        
+        /* 讓所有標題維持論文的專業學術感 */
+        h1, h2, h3, h4 {
+            font-family: var(--font-academic);
+            font-weight: bold;
+            color: #1a202c;
+            border-bottom: 1px solid #edf2f7;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+        }
+
+        .academic-text {
+            font-family: var(--font-academic);
+            font-size: 1.1em;
+        }
+
+        /* ================= 頂部導航欄 (毛玻璃特效) ================= */
+        .topnav {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px); /* 毛玻璃模糊效果 */
+            -webkit-backdrop-filter: blur(10px);
+            overflow: hidden;
+            border-bottom: 1px solid rgba(200, 200, 200, 0.5);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .topnav button {
+            background-color: transparent;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 16px 24px;
+            font-size: 17px;
+            font-family: var(--font-modern);
+            font-weight: 600;
+            color: #4a5568;
+            transition: all 0.3s ease;
+        }
+        .topnav button:hover {
+            color: #2A10AB;
+            background-color: rgba(233, 236, 239, 0.5);
+        }
+        .topnav button.active {
+            color: #2A10AB;
+            border-bottom: 3px solid #2A10AB;
+        }
+
+        /* ================= 內容區塊 (卡片式設計) ================= */
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .section {
+            display: none; 
+            background: #ffffff;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06); /* 柔和的卡片陰影 */
+            animation: fadeIn 0.5s;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ================= Tabs (分頁) ================= */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #edf2f7;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: var(--font-modern);
+            color: #718096;
+            transition: 0.2s;
+        }
+        .tab-btn:hover {
+            color: #ff4b4b;
+        }
+        .tab-btn.active {
+            border-bottom: 3px solid #ff4b4b;
+            color: #ff4b4b;
+            font-weight: bold;
+            margin-bottom: -2px; /* 覆蓋底部邊線 */
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.4s; }
+
+        /* ================= Metrics (數據看板) ================= */
+        .metrics-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .metric-card {
+            flex: 1;
+            min-width: 200px;
+            background: linear-gradient(to bottom right, #ffffff, #f8f9fa);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .metric-label {
+            font-size: 15px;
+            font-weight: 600;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .metric-value {
+            font-size: 28px;
+            color: #2A10AB;
+            margin-top: 8px;
+            font-weight: bold;
+            font-family: var(--font-modern);
+        }
+
+        /* ================= 其他元件 ================= */
+        .info-box {
+            background-color: #f0f7ff;
+            border-left: 4px solid #3182ce;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 15px;
+            font-size: 15px;
+            color: #2c5282;
+        }
+        .footer {
+            position: fixed; 
+            left: 0; 
+            bottom: 0; 
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.95); 
+            color: #4a5568; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px; 
+            font-size: 14px; 
+            padding: 12px 0; 
+            border-top: 1px solid #e2e8f0; 
+            z-index: 999;
+            font-family: var(--font-modern);
+        }
+        .footer img {
+            height: 24px;
+            width: auto;
+        }
+        .two-cols {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .col-main { flex: 3; min-width: 300px; }
+        .col-info { flex: 1; min-width: 250px; }
+        
+        .slider-container {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 24px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 15px;
+            background: white;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 12px 15px;
+            text-align: left;
+        }
+        th { background-color: #f7fafc; color: #4a5568; font-weight: 600; }
+        
+        button.btn-primary {
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: 0.2s;
+            box-shadow: 0 4px 6px rgba(49, 130, 206, 0.2);
+        }
+        button.btn-primary:hover { 
+            background-color: #2b6cb0; 
+            transform: translateY(-1px);
+            box-shadow: 0 6px 8px rgba(49, 130, 206, 0.3);
+        }
+        
+        /* 折疊面板 */
+        .expander {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+        .expander-header {
+            padding: 12px 15px;
+            background: #f7fafc;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 15px;
+            color: #4a5568;
+            transition: background 0.2s;
+        }
+        .expander-header:hover { background: #edf2f7; }
+        .expander-content {
+            padding: 15px;
+            display: none;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+        /* ================= 手機與平板專用相容設定 (RWD) ================= */
+        @media (max-width: 768px) {
+            /* 1. 導航列：在手機上支援橫向滑動，避免按鈕被擠壓 */
+            .topnav {
+                justify-content: flex-start;
+                overflow-x: auto;
+                white-space: nowrap;
+                -webkit-overflow-scrolling: touch; /* 滑動順暢度優化 */
+            }
+            .topnav button {
+                padding: 12px 16px;
+                font-size: 14px;
+                flex-shrink: 0; /* 防止按鈕被壓縮 */
+            }
+
+            /* 2. 容器與卡片內距：縮小邊界，充分利用手機寬度 */
+            .container {
+                padding: 0 10px;
+                margin: 15px auto;
+            }
+            .section {
+                padding: 20px 15px;
+                border-radius: 8px;
+            }
+
+            /* 3. 數據看板：改為 2 欄排列，避免字體過大撐破 */
+            .metric-card {
+                min-width: calc(50% - 10px); /* 一排放兩個 */
+                padding: 12px 8px;
+            }
+            .metric-value {
+                font-size: 20px;
+            }
+            .metric-label {
+                font-size: 12px;
+            }
+
+            /* 4. 3D 圖表：手機上適度降低高度，方便手指滾動頁面 */
+            #plotly-div {
+                height: 380px !important;
+            }
+
+            /* 5. 分頁頁籤 (Tabs)：過多時可自動橫向滑動 */
+            .tabs {
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            .tab-btn {
+                padding: 8px 14px;
+                font-size: 14px;
+            }
+
+            /* 6. 底部版權宣告：手機上縮小圖示與文字 */
+            .footer {
+                flex-direction: column;
+                gap: 6px;
+                font-size: 12px;
+                padding: 10px 0;
+                text-align: center;
+            }
+            .footer img {
+                height: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 頂部導航欄 -->
+    <nav class="topnav">
+        <button class="nav-link active" onclick="openSection(event, 'sec-video')">Concept Video</button>
+        <button class="nav-link" onclick="openSection(event, 'sec-gallery')">Process Gallery</button>
+        <button class="nav-link" onclick="openSection(event, 'sec-sim')">Interactive Simulation</button>
+        <button class="nav-link" onclick="openSection(event, 'sec-info')">Project Info</button>
+    </nav>
+
+    <div class="container">
+        
+        <!-- SECTION 1: Concept Video -->
+        <div id="sec-video" class="section" style="display: block;">
+            <h2>1. Fundamental Concepts</h2>
+            <h3 class="academic-text">FIB: Working Principles & Applications</h3>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab(event, 'vid-en', 'grp-vid')">English Video</button>
+                <button class="tab-btn" onclick="openTab(event, 'vid-tw', 'grp-vid')">中文影片</button>
+            </div>
+            
+            <div id="vid-en" class="tab-content active grp-vid">
+                <div class="info-box">
+                    <strong>📺 Video Highlights:</strong><br>
+                    * <strong>Working Principle:</strong> Liquid Metal Ion Source (LMIS), Electrostatic Lenses, and Sputtering effect.<br>
+                    * <strong>Key Applications:</strong> IC Circuit Edit and Nanopatterning.
+                </div>
+                <video controls width="100%" style="background:#000; border-radius:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    <source src="assets/nanofab_process_video_en.mp4" type="video/mp4">
+                    ⚠️ English video not found (assets/nanofab_process_video_en.mp4)
+                </video>
+            </div>
+            
+            <div id="vid-tw" class="tab-content grp-vid">
+                <div class="info-box">
+                    <strong>📺 影片重點導讀：</strong><br>
+                    * <strong>工作原理：</strong> 液態金屬離子源 (LMIS)、靜電透鏡聚焦、以及離子轟擊產生的物理濺鍍效應。<br>
+                    * <strong>主要應用：</strong> 積體電路修補 (Circuit Edit)、奈米結構加工。
+                </div>
+                <video controls width="100%" style="background:#000; border-radius:10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    <source src="assets/nanofab_process_video_tw.mp4" type="video/mp4">
+                    ⚠️ 中文影片檔案未找到 (assets/nanofab_process_video_tw.mp4)
+                </video>
+            </div>
+        </div>
+
+        <!-- SECTION 2: Process Gallery -->
+        <div id="sec-gallery" class="section">
+            <h2>2. Nanofabrication Gallery</h2>
+            <p>The working principle, steps, and practical applications of focused ion beams</p>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab(event, 'img-en', 'grp-img')">English Diagram</button>
+                <button class="tab-btn" onclick="openTab(event, 'img-tw', 'grp-img')">中文圖解</button>
+            </div>
+            
+            <div id="img-en" class="tab-content active grp-img">
+                <h4 class="academic-text">📄 FIB Milling Principle</h4>
+                <img src="assets/nanofab_process_image_en.png" alt="Figure 1: FIB Nano-cutting Mechanism (English)" style="max-width:100%; border-radius:10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            </div>
+            
+            <div id="img-tw" class="tab-content grp-img">
+                <h4 class="academic-text">📄 聚焦離子束切割原理</h4>
+                <img src="assets/nanofab_process_image_tw.png" alt="圖一：聚焦離子束奈米切割機制 (中文)" style="max-width:100%; border-radius:10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            </div>
+        </div>
+
+        <!-- SECTION 3: Interactive Simulation -->
+        <div id="sec-sim" class="section">
+            <h2>3. FIB Fabrication Control Station</h2>
+            
+            <!-- 數據看板 -->
+            <div class="metrics-container">
+                <div class="metric-card">
+                    <div class="metric-label">Beam Energy</div>
+                    <div class="metric-value" id="val-volt">30 keV</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Beam Current</div>
+                    <div class="metric-value" id="val-curr">10.0 pA</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Sputter Rate</div>
+                    <div class="metric-value" id="val-rate">3.00 nm³/s</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Est. Process Time</div>
+                    <div class="metric-value" id="val-time">333.3 s</div>
+                </div>
+            </div>
+
+            <!-- 控制面板 -->
+            <div class="slider-container">
+                <strong>🎛️ Control Panel</strong><br><br>
+                <label>HV Voltage (kV): <span id="lbl-volt" style="font-weight:bold; color:#3182ce;">30</span></label>
+                <input type="range" id="in-volt" min="5" max="30" value="30" style="width:100%; margin-bottom: 15px;" oninput="updateSim()">
+                
+                <label>Beam Current (pA): <span id="lbl-curr" style="font-weight:bold; color:#3182ce;">10.0</span></label>
+                <input type="range" id="in-curr" min="1" max="100" step="1" value="10" style="width:100%;" oninput="updateSim()">
+            </div>
+
+            <div class="two-cols">
+                <!-- 左側 3D 圖表 -->
+                <div class="col-main">
+                    <h3>🖥️ Real-time 3D Visualization</h3>
+                    <div id="plotly-div" style="width:100%; height:550px; background:black; border-radius:10px; overflow:hidden;"></div>
+                    <br>
+                    <div class="info-box" style="border-radius: 8px; border-left-color: #48bb78; background-color: #f0fff4; color: #276749;">
+                        <strong>Target Volume</strong>: 1000.0 nm³ | <strong>Sputter Rate</strong> = (Current × Voltage) / 100 | <strong>Est. Time</strong> = Volume / Rate
+                    </div>
+                </div>
+                
+                <!-- 右側資訊與下載 -->
+                <div class="col-info">
+                    <h3>📑 Data Log</h3>
+                    <table>
+                        <tr><th>Param</th><th>Value</th></tr>
+                        <tr><td>Depth</td><td id="log-depth">318.3 nm</td></tr>
+                        <tr><td>Diam</td><td id="log-diam">2.0 nm</td></tr>
+                        <tr><td>Area Dose</td><td id="log-dose">1061 pA·s/nm²</td></tr>
+                    </table>
+                    <button class="btn-primary" onclick="downloadCSV()">💾 Save CSV</button>
+
+                    <!-- 折疊面板 (套用學術字體) -->
+                    <div class="expander">
+                        <div class="expander-header" onclick="toggleExpander(this)">📐 View Physics Formulas ▼</div>
+                        <div class="expander-content academic-text">
+                            <p><strong>(1) Beam Diameter (\(D\))</strong></p>
+                            <p>考慮空間電荷效應與電壓聚焦：</p>
+                            <p>$$D = 2 \times \left(1.5 + \frac{I}{20} - \frac{V}{100}\right)$$</p>
+                            
+                            <p><strong>(2) Sputter Depth (\(h\))</strong></p>
+                            <p>總體積等於速率乘時間，電流 \(I\) 剛好互消，深度僅取決於電壓與面積：</p>
+                            <p>$$h = \frac{Volume}{Area} = \frac{10 \times V}{\pi (D/2)^2}$$</p>
+                            
+                            <p><strong>(3) Area Dose</strong></p>
+                            <p>單位面積所承受的總劑量：</p>
+                            <p>$$Area\ Dose = \frac{1000}{\pi (D/2)^2}$$</p>
+                            <i style="color:gray; font-family: var(--font-modern); font-size:0.9em;">*\(I\): Current (pA) | \(V\): Voltage (kV)*</i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: Project Info -->
+        <div id="sec-info" class="section">
+            <h2>4. Project Details & Scientific Background</h2>
+            
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab(event, 'info-sci', 'grp-info')">Scientific Principles</button>
+                <button class="tab-btn" onclick="openTab(event, 'info-spec', 'grp-info')">System Specs</button>
+                <button class="tab-btn" onclick="openTab(event, 'info-team', 'grp-info')">About the Team</button>
+            </div>
+            
+            <div id="info-sci" class="tab-content active grp-info academic-text">
+                <h3>Fundamental Principles</h3>
+                <h4>Breaking the Diffraction Limit</h4>
+                <p>The core of nanofabrication lies in overcoming the Rayleigh criterion:</p>
+                <p>$$R = 0.61 \frac{\lambda}{NA}$$</p>
+                <p>Since optical lithography is limited by the wavelength of light, we utilize <strong>De Broglie Wavelength</strong> of electrons/ions:</p>
+                <p>$$\lambda = \frac{h}{p}$$</p>
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+                <h3>🔬 Space Charge Effect</h3>
+                <div class="info-box" style="font-family: var(--font-modern);">
+                    To achieve sub-10 nm resolution, we operate in the <strong>pico-ampere (pA)</strong> regime.<br><br>
+                    Higher beam currents increase the <strong>Beam Spot Size</strong> due to the Coulomb repulsion between ions (<strong>Space Charge Effect</strong>), reducing resolution.
+                </div>
+            </div>
+
+            <div id="info-spec" class="tab-content grp-info">
+                <h3>Instrument Architecture</h3>
+                <p>This simulation mimics a <strong>Dual-Beam FIB-SEM System</strong>.</p>
+                <div class="two-cols">
+                    <div class="info-box" style="flex:1;"><strong>SEM Column:</strong> For real-time monitoring.</div>
+                    <div class="info-box" style="flex:1;"><strong>FIB Column:</strong> For precise nano-milling.</div>
+                    <div class="info-box" style="flex:1; border-left-color:#dd6b20; background-color:#fffaf0; color:#c05621;"><strong>GIS:</strong> Gas Injection System for Pt/C deposition.</div>
+                    <div class="info-box" style="flex:1; border-left-color:#805ad5; background-color:#faf5ff; color:#6b46c1;"><strong>EDS:</strong> Energy Dispersive X-ray Spectroscopy.</div>
+                </div>
+            </div>
+
+            <div id="info-team" class="tab-content grp-info">
+                <h3>Project Author</h3>
+                <div style="background-color: #e6f4ea; border-left: 4px solid #34a853; padding: 15px; border-radius: 4px; margin-bottom:15px;">
+                    This project was developed for the Advanced Physics Laboratory (B).
+                </div>
+                <p style="font-size: 16px;">
+                    <strong>Institution:</strong> National Chung Cheng University (CCU)<br>
+                    <strong>Course:</strong> Basic Physics Experiment (II)<br>
+                    <strong>Date:</strong> January 2026<br>
+                    <strong>Author:</strong> CHANG-YU, WU
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部版權 -->
+    <div class="footer">
+        <img src="ccu-logo.png" alt="CCU Logo">
+        <span>© 2026 CHANG-YU, WU | National Chung Cheng University, Dept. of Physics | General Physics Lab (B) (II)  Initial Report</span>
+    </div>
+
+    <!-- JavaScript 邏輯 (保持不變) -->
+    <script>
+        // 1. 導航欄切換 Section
+        function openSection(evt, sectionName) {
+            let i, sections, navlinks;
+            sections = document.getElementsByClassName("section");
+            for (i = 0; i < sections.length; i++) {
+                sections[i].style.display = "none";
+            }
+            navlinks = document.getElementsByClassName("nav-link");
+            for (i = 0; i < navlinks.length; i++) {
+                navlinks[i].className = navlinks[i].className.replace(" active", "");
+            }
+            document.getElementById(sectionName).style.display = "block";
+            evt.currentTarget.className += " active";
+            
+            if(sectionName === 'sec-sim'){
+                window.dispatchEvent(new Event('resize'));
+            }
+        }
+
+        // 2. Tabs 切換
+        function openTab(evt, tabName, groupName) {
+            let i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName(groupName);
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = evt.currentTarget.parentElement.getElementsByClassName("tab-btn");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
+        // 3. 折疊面板
+        function toggleExpander(element) {
+            let content = element.nextElementSibling;
+            if (content.style.display === "block") {
+                content.style.display = "none";
+                element.innerHTML = element.innerHTML.replace("▲", "▼");
+            } else {
+                content.style.display = "block";
+                element.innerHTML = element.innerHTML.replace("▼", "▲");
+            }
+        }
+
+        // 4. 物理模擬與 Plotly 動畫
+        let currentCSVData = "";
+
+        function updateSim() {
+            let voltage = parseFloat(document.getElementById("in-volt").value);
+            let current = parseFloat(document.getElementById("in-curr").value);
+            
+            document.getElementById("lbl-volt").innerText = voltage;
+            document.getElementById("lbl-curr").innerText = current;
+
+            // 物理邏輯
+            let hole_radius = 1.5 + (current / 20.0) - (voltage / 100.0);
+            if (hole_radius < 1.0) hole_radius = 1.0;
+            let area = 3.14159 * (hole_radius ** 2);
+            let target_volume = 1000.0;
+            
+            let sputter_rate = (current * voltage) / 100;
+            let est_time = (sputter_rate > 0) ? (target_volume / sputter_rate) : 0;
+            let target_depth = target_volume / area;
+            let total_charge = current * est_time;
+            let area_dose = total_charge / area;
+
+            // 更新 UI
+            document.getElementById("val-volt").innerText = voltage + " keV";
+            document.getElementById("val-curr").innerText = current.toFixed(1) + " pA";
+            document.getElementById("val-rate").innerText = sputter_rate.toFixed(2) + " nm³/s";
+            document.getElementById("val-time").innerText = est_time.toFixed(1) + " s";
+
+            document.getElementById("log-depth").innerText = target_depth.toFixed(1) + " nm";
+            document.getElementById("log-diam").innerText = (hole_radius * 2).toFixed(1) + " nm";
+            document.getElementById("log-dose").innerText = area_dose.toFixed(0) + " pA·s/nm²";
+
+            currentCSVData = `Voltage,Current,Depth,Diam,Area_Dose\n${voltage},${current},${target_depth.toFixed(2)},${(hole_radius*2).toFixed(2)},${area_dose.toFixed(2)}`;
+
+            // 繪製 Plotly 動畫
+            drawPlotlyAnimation(hole_radius, target_depth, current);
+        }
+
+        function drawPlotlyAnimation(r_max, target_depth, current) {
+            let num_theta = 20;
+            let num_z = 8;
+            let theta = [];
+            for (let i = 0; i <= num_theta; i++) theta.push((i * 2 * Math.PI) / num_theta);
+            
+            // ================= 初始資料 =================
+            let x_init = [], y_init = [], z_init = [];
+            for (let i = 0; i < num_z; i++) {
+                let x_row = [], y_row = [], z_row = [];
+                for (let j = 0; j <= num_theta; j++) {
+                    x_row.push(r_max * Math.cos(theta[j]));
+                    y_row.push(r_max * Math.sin(theta[j]));
+                    z_row.push(0); 
+                }
+                x_init.push(x_row); y_init.push(y_row); z_init.push(z_row);
+            }
+
+            let initial_data = [
+                {
+                    type: 'surface',
+                    x: x_init, y: y_init, z: z_init,
+                    colorscale: 'Hot', showscale: false, opacity: 0.9
+                },
+                {
+                    type: 'scatter3d',
+                    x: [0], y: [0], z: [0],
+                    mode: 'markers', marker: { size: 2, color: 'cyan' }
+                }
+            ];
+
+            // ================= 產生動畫影格 =================
+            let frames = [];
+            let total_frames = 20;
+            let num_sparks = Math.max(5, Math.floor(current * 3));
+
+            for (let k = 0; k <= total_frames; k++) {
+                let d = (target_depth / total_frames) * k;
+                
+                let z_cyl = [];
+                for (let i = 0; i < num_z; i++) z_cyl.push(0 - (d / (num_z - 1)) * i);
+
+                let x_f = [], y_f = [], z_f = [];
+                for (let i = 0; i < num_z; i++) {
+                    let x_row = [], y_row = [], z_row = [];
+                    for (let j = 0; j <= num_theta; j++) {
+                        x_row.push(r_max * Math.cos(theta[j]));
+                        y_row.push(r_max * Math.sin(theta[j]));
+                        z_row.push(z_cyl[i]);
+                    }
+                    x_f.push(x_row); y_f.push(y_row); z_f.push(z_row);
+                }
+
+                let sx = [], sy = [], sz = [];
+                for (let i = 0; i < num_sparks; i++) {
+                    sx.push((Math.random() * 2 - 1) * r_max);
+                    sy.push((Math.random() * 2 - 1) * r_max);
+                    sz.push(Math.random() * (30 + current / 2));
+                }
+
+                frames.push({
+                    name: String(k),
+                    data: [
+                        { type: 'surface', x: x_f, y: y_f, z: z_f },
+                        { type: 'scatter3d', x: sx, y: sy, z: sz }
+                    ]
+                });
+            }
+
+            // ================= 排版與播放按鈕 =================
+            let layout = {
+                title: { text: 'FIB Hole Simulation', font: {family: 'Segoe UI, sans-serif', size: 18} },
+                paper_bgcolor: 'black',
+                plot_bgcolor: 'black',
+                font: { color: '#e2e8f0' },
+                margin: { l: 0, r: 0, b: 0, t: 40 },
+                scene: {
+                    xaxis: { range: [-40, 40], title: 'X (nm)', gridcolor: '#4a5568' },
+                    yaxis: { range: [-40, 40], title: 'Y (nm)', gridcolor: '#4a5568' },
+                    zaxis: { range: [-120, 60], title: 'Depth (nm)', gridcolor: '#4a5568' },
+                    aspectmode: 'manual',
+                    aspectratio: { x: 1, y: 1, z: 1.2 }
+                },
+                updatemenus: [{
+                    type: "buttons",
+                    showactive: false,
+                    x: 0.1, y: 0.05,
+                    buttons: [{
+                        label: "▶️ RUN",
+                        method: "animate",
+                        args: [null, {
+                            frame: { duration: 80, redraw: true }, 
+                            fromcurrent: false, 
+                            mode: "immediate"
+                        }]
+                    }]
+                }]
+            };
+
+            Plotly.newPlot('plotly-div', initial_data, layout).then(function() {
+                Plotly.addFrames('plotly-div', frames);
+            });
+        }
+
+        function downloadCSV() {
+            const blob = new Blob([currentCSVData], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'experiment_data.csv');
+            a.click();
+        }
+
+        window.onload = () => {
+            updateSim(); 
+        };
+    </script>
+</body>
+</html>
